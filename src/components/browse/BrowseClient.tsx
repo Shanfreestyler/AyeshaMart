@@ -1,11 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { cattleData } from '@/lib/mockData/cattleData';
 import { ISortOption } from '@/types';
 import Container from '../Container';
-import CattleCard from '../CattleCard';
+import CattleCard, { CattleCardSkeleton } from '../CattleCard';
 
 const sortOptions: ISortOption[] = [
   { value: 'value-desc', label: 'Value Score: High to Low' },
@@ -19,6 +19,10 @@ type StatusFilter = 'all' | 'available' | 'sold';
 const breedOptions = Array.from(new Set(cattleData.map((c) => c.breed))).sort();
 const locationOptions = Array.from(new Set(cattleData.map((c) => c.location))).sort();
 
+// Price bounds for the range filter.
+const PRICE_MIN = Math.min(...cattleData.map((c) => c.price));
+const PRICE_MAX = Math.max(...cattleData.map((c) => c.price));
+
 const selectClass =
   'w-full rounded-lg border border-dark-green/15 bg-cream px-3 py-2.5 text-sm text-dark-green outline-none transition-colors focus:border-dark-green focus:ring-2 focus:ring-dark-green/20';
 
@@ -28,15 +32,36 @@ export default function BrowseClient() {
   const [location, setLocation] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
   const [sort, setSort] = useState('value-desc');
+  const [minPrice, setMinPrice] = useState('');
+  const [maxPrice, setMaxPrice] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 6;
+
+  useEffect(() => {
+    // Simulate API fetch delay for better UX demonstration.
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, breed, location, status, minPrice, maxPrice]);
 
   const results = useMemo(() => {
     const query = search.trim().toLowerCase();
+    const min = minPrice ? Number(minPrice) : null;
+    const max = maxPrice ? Number(maxPrice) : null;
 
     const filtered = cattleData.filter((c) => {
       if (query && !c.name.toLowerCase().includes(query)) return false;
       if (breed && c.breed !== breed) return false;
       if (location && c.location !== location) return false;
       if (status !== 'all' && c.status !== status) return false;
+      if (min !== null && c.price < min) return false;
+      if (max !== null && c.price > max) return false;
       return true;
     });
 
@@ -51,10 +76,22 @@ export default function BrowseClient() {
           return b.valueScore - a.valueScore;
       }
     });
-  }, [search, breed, location, status, sort]);
+  }, [search, breed, location, status, sort, minPrice, maxPrice]);
+
+  const paginatedResults = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return results.slice(startIndex, startIndex + itemsPerPage);
+  }, [results, currentPage]);
+
+  const totalPages = Math.ceil(results.length / itemsPerPage);
 
   const hasActiveFilters =
-    search.trim() !== '' || breed !== '' || location !== '' || status !== 'all';
+    search.trim() !== '' ||
+    breed !== '' ||
+    location !== '' ||
+    status !== 'all' ||
+    minPrice !== '' ||
+    maxPrice !== '';
 
   const clearFilters = () => {
     setSearch('');
@@ -62,6 +99,9 @@ export default function BrowseClient() {
     setLocation('');
     setStatus('all');
     setSort('value-desc');
+    setMinPrice('');
+    setMaxPrice('');
+    setCurrentPage(1);
   };
 
   return (
@@ -167,6 +207,40 @@ export default function BrowseClient() {
               </select>
             </div>
           </div>
+
+          {/* Price range row */}
+          <div className="mt-3 flex flex-col gap-2 border-t border-dark-green/10 pt-3 sm:flex-row sm:items-end sm:gap-4">
+            <span className="text-xs font-semibold uppercase tracking-wide text-dark-green/40 sm:w-28">
+              Price (BDT)
+            </span>
+            <div className="flex flex-1 items-center gap-2">
+              <input
+                id="min-price"
+                type="number"
+                inputMode="numeric"
+                min={PRICE_MIN}
+                max={PRICE_MAX}
+                value={minPrice}
+                onChange={(e) => setMinPrice(e.target.value)}
+                placeholder={`Min (${PRICE_MIN.toLocaleString()})`}
+                className={selectClass}
+                aria-label="Minimum price"
+              />
+              <span className="text-dark-green/40">–</span>
+              <input
+                id="max-price"
+                type="number"
+                inputMode="numeric"
+                min={PRICE_MIN}
+                max={PRICE_MAX}
+                value={maxPrice}
+                onChange={(e) => setMaxPrice(e.target.value)}
+                placeholder={`Max (${PRICE_MAX.toLocaleString()})`}
+                className={selectClass}
+                aria-label="Maximum price"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Result summary */}
@@ -187,9 +261,15 @@ export default function BrowseClient() {
         </div>
 
         {/* Grid or empty state */}
-        {results.length > 0 ? (
+        {isLoading ? (
           <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {results.map((cattle, i) => (
+            {[...Array(6)].map((_, i) => (
+              <CattleCardSkeleton key={i} />
+            ))}
+          </div>
+        ) : paginatedResults.length > 0 ? (
+          <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {paginatedResults.map((cattle, i) => (
               <motion.div
                 key={cattle.id}
                 layout
@@ -221,6 +301,45 @@ export default function BrowseClient() {
                 Clear all filters
               </button>
             )}
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {!isLoading && results.length > itemsPerPage && (
+          <div className="mt-12 flex items-center justify-center gap-2">
+            <button
+              type="button"
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage((p) => p - 1)}
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-dark-green/10 bg-white text-dark-green transition-colors hover:bg-dark-green/5 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              ←
+            </button>
+            
+            <div className="flex items-center gap-1">
+              {[...Array(totalPages)].map((_, i) => (
+                <button
+                  key={i + 1}
+                  onClick={() => setCurrentPage(i + 1)}
+                  className={`h-10 w-10 rounded-lg text-sm font-medium transition-colors ${
+                    currentPage === i + 1
+                      ? 'bg-dark-green text-cream'
+                      : 'text-dark-green hover:bg-dark-green/5'
+                  }`}
+                >
+                  {i + 1}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage((p) => p + 1)}
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-dark-green/10 bg-white text-dark-green transition-colors hover:bg-dark-green/5 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              →
+            </button>
           </div>
         )}
       </Container>

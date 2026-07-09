@@ -3,12 +3,8 @@ import Footer from '@/components/Footer';
 import Container from '@/components/Container';
 import { cattleData } from '@/lib/mockData/cattleData';
 import { notFound } from 'next/navigation';
-
-interface Props {
-  params: Promise<{
-    id: string;
-  }>;
-}
+import { sellers } from '@/lib/mockData/sellers';
+import WhatsAppButton from '@/components/WhatsAppButton';
 
 const formatBDT = (value: number) =>
   new Intl.NumberFormat('en-BD', {
@@ -17,16 +13,46 @@ const formatBDT = (value: number) =>
     maximumFractionDigits: 0,
   }).format(value);
 
+interface Props {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
 export default async function CattleDetailsPage({ params }: Props) {
   const { id } = await params;
   const cattle = cattleData.find((c) => c.id === id);
+  const seller = sellers.find((s) => s.id === cattle?.sellerId);
 
   if (!cattle) {
     notFound();
   }
 
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: cattle.name,
+    image: cattle.images[0],
+    description: `${cattle.breed} cattle located in ${cattle.location}. Weight: ${cattle.specs.weightKg}kg, Value Score: ${cattle.valueScore}.`,
+    brand: {
+      '@type': 'Brand',
+      name: cattle.breed,
+    },
+    offers: {
+      '@type': 'Offer',
+      price: cattle.price,
+      priceCurrency: 'BDT',
+      availability: cattle.status === 'available' ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      url: `https://qurbanihub.com/cattle/${cattle.id}`,
+    },
+  };
+
   return (
     <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <Header />
 
       <main className="py-12">
@@ -89,6 +115,38 @@ export default async function CattleDetailsPage({ params }: Props) {
                   {formatBDT(cattle.price)}
                 </p>
               </div>
+
+              {seller && (
+                <div className="mt-8 rounded-2xl border border-dark-green/10 bg-cream-light p-5">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-dark-green/40">
+                    Listed by
+                  </p>
+                  <div className="mt-3 flex items-center gap-3">
+                    <img
+                      src={seller.avatar}
+                      alt={seller.name}
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                    <div>
+                      <p className="text-sm font-semibold text-dark-green">
+                        {seller.name}
+                      </p>
+                      <p className="text-xs text-dark-green/50">
+                        ★ {seller.rating.toFixed(1)} rating
+                      </p>
+                    </div>
+                  </div>
+                  {cattle.status === 'available' && (
+                    <WhatsAppButton 
+                      phone={seller.contacts.phone} 
+                      cattleName={cattle.name} 
+                    />
+                  )}
+                  <p className="mt-2 text-center text-xs text-dark-green/40">
+                    {seller.contacts.phone}
+                  </p>
+                </div>
+              )}
 
               <a
                 href="/browse"

@@ -22,11 +22,39 @@ const FALLBACK_IMAGE =
        <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
              font-family="Inter, system-ui, sans-serif" font-size="28" fill="#14532d" opacity="0.4">
          Image unavailable
-       </text>
+     </text>
      </svg>`
   );
 
+export function CattleCardSkeleton() {
+  return (
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-dark-green/10 bg-cream-light shadow-sm">
+      <div className="relative aspect-[4/3] bg-dark-green/5 animate-pulse" />
+      <div className="flex flex-1 flex-col p-5 gap-4">
+        <div className="flex justify-between items-start gap-3">
+          <div className="h-5 w-3/4 bg-dark-green/10 rounded animate-pulse" />
+          <div className="h-5 w-12 bg-dark-green/10 rounded animate-pulse" />
+        </div>
+        <div className="h-4 w-1/3 bg-dark-green/10 rounded animate-pulse" />
+        <div className="grid grid-cols-2 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="space-y-2">
+              <div className="h-3 w-full bg-dark-green/5 rounded animate-pulse" />
+              <div className="h-4 w-3/4 bg-dark-green/10 rounded animate-pulse" />
+            </div>
+          ))}
+        </div>
+        <div className="mt-auto pt-5 flex justify-between items-end">
+          <div className="h-7 w-1/4 bg-dark-green/10 rounded animate-pulse" />
+          <div className="h-4 w-1/4 bg-dark-green/10 rounded animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CattleCard({ cattle }: CattleCardProps) {
+
   const isSold = cattle.status === 'sold';
 
   return (
